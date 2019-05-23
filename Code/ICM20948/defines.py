@@ -69,14 +69,18 @@ EXT_SENS_DATA_22        = 0x51
 EXT_SENS_DATA_23        = 0x52
 FIFO_EN_1               = 0x66
 FIFO_EN_2               = 0x67
-FIFO_RST		        = 0x68
-FIFO_MODE		        = 0x69
+FIFO_RST                = 0x68
+FIFO_MODE               = 0x69
 FIFO_COUNTH             = 0x70
 FIFO_COUNTL             = 0x71
 FIFO_R_W                = 0x72
 DATA_RDY_STATUS	        = 0x74
-FIFO_CFG		        = 0x76
-REG_BANK_SEL	        = 0x7F
+HW_FIX_DISABLE          = 0x75
+FIFO_CFG                = 0x76
+MEM_START_ADDR          = 0x7C
+MEM_R_W                 = 0x7D
+MEM_BANK_SEL            = 0x7E
+BANK_SEL                = 0x7F
 
 # USER BANK 1 REGISTER MAP
 SELF_TEST_X_GYRO        = 0x02
@@ -141,8 +145,13 @@ I2C_SLV4_DI             = 0x17
 I2C_SLV4_DO             = 0x16
 
 # Other constants
-READ_FLAG = 0x80
-REG_BANK_0 = (0 << 4)
-REG_BANK_1 = (1 << 4)
-REG_BANK_2 = (2 << 4)
-REG_BANK_3 = (3 << 4)
+READ_FLAG               = 0x80
+REG_BANK_0              = (0 << 4)
+REG_BANK_1              = (1 << 4)
+REG_BANK_2              = (2 << 4)
+REG_BANK_3              = (3 << 4)
+
+INV_MAX_SERIAL_READ     = 16
+INV_MAX_SERIAL_WRITE    = 16
+
+DMP_LOAD_START          = 0x90

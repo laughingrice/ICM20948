@@ -17,6 +17,7 @@ class ICM20948:
     def __init__(self, client=SPI_CLIENT):
         self.InitICM20948(client)
 
+
     def __del__(self):
         self.spi.close()
 
@@ -66,9 +67,53 @@ class ICM20948:
         if res != 0xEA:
             raise Exception('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
 
+
+    def InitDPM(self):
+        from .icm20948_img_dmp3a import dmp_img
+
+        mem_bank = 0
+        start_address = DMP_LOAD_START
+        data_pos = 0
+
+        # Write dpm firmware to memory
+        while data_pos < len(dmp_img):
+            write_len = min((256 - start_address, len(dmp_img[data_pos:])))
+            self.WriteMems(mem_bank, start_address, dmp_img[data_pos:data_pos + write_len])
+
+            data_pos += write_len
+            mem_bank += 1
+            start_address = 0
+
+
+    def ValidateDPM(self):
+        from .icm20948_img_dmp3a import dmp_img  # So that we know how much to read  
+
+        read_img = [0] * len(dmp_img)
+
+        mem_bank = 0
+        start_address = DMP_LOAD_START
+        data_pos = 0
+
+        # Write dpm firmware to memory
+        while data_pos < len(dmp_img):
+            read_len = min((256 - start_address, len(dmp_img[data_pos:])))
+            read_img[data_pos:data_pos + read_len] = self.ReadMems(mem_bank, start_address, read_len)
+
+            data_pos += read_len
+            mem_bank += 1
+            start_address = 0
+
+        diff = 0
+        for z in zip(dmp_img, read_img):
+            diff += abs(z[1] - z[0])
+
+        return diff == 0
+
+
     def measure(self):
         data = self.ReadACC() + self.ReadGyro() + self.ReadTemp()
         return data
+
 
     def ReadACC(self):
         data = self.ReadRegs(ACCEL_XOUT_H, 6)
@@ -76,11 +121,13 @@ class ICM20948:
 
         return data
 
+
     def ReadGyro(self):
         data = self.ReadRegs(GYRO_XOUT_H, 6)
         data = [twos_comp(x[1] + (x[0] << 8), 16) * self.gyro_scale for x in zip(data[0::2], data[1::2])]
 
         return data
+
 
     def ReadCompas(self):
         """
@@ -89,14 +136,17 @@ class ICM20948:
         """
         pass
 
+
     def ReadTemp(self):
         data = self.ReadRegs(TEMP_OUT_H, 2)
         data = [twos_comp(x[1] + (x[0] << 8), 16) * self.temp_scale for x in zip(data[0::2], data[1::2])]
 
         return data
 
+
     def WriteReg(self, reg, data):
         return self.WriteRegs(reg, [data])[0]
+
 
     def WriteRegs(self, reg, data):
         msg = [reg] + data
@@ -104,8 +154,10 @@ class ICM20948:
 
         return res[1:]
 
+
     def ReadReg(self, reg):
         return self.ReadRegs(reg, 1)[0]
+
 
     def ReadRegs(self, reg, cnt):
         msg = [reg | READ_FLAG] + [0x00] * cnt
@@ -113,8 +165,34 @@ class ICM20948:
 
         return res[1:]
 
+
     def SelectBank(self, bank):
-        self.WriteReg(REG_BANK_SEL, bank)
+        self.WriteReg(BANK_SEL, bank)
+
+
+    def WriteMems(self, bank, address, data):
+        self.WriteReg(MEM_BANK_SEL, bank)
+        
+        # TODO: it might be possiple to write INV_MAX_SERIAL_WRITE bytes at a time
+        for d in data:
+            self.WriteReg(MEM_START_ADDR, address)
+            self.WriteReg(MEM_R_W, d)
+            address += 1
+
+
+    def ReadMems(self, bank, address, len):
+        read_data = [0] * len
+
+        self.WriteReg(MEM_BANK_SEL, bank)
+        
+        # TODO: it might be possiple to read INV_MAX_SERIAL_WRITE bytes at a time
+        for i in range(len):
+            self.WriteReg(MEM_START_ADDR, address)
+            read_data[i] = self.ReadReg(MEM_R_W)
+            address += 1
+
+        return read_data
+
 
     def SelfTest(self):
         """
@@ -122,6 +200,7 @@ class ICM20948:
         TODO: Not translated from C yet
         """
         pass
+
 
     def SelfCalibrate(self):
         """
