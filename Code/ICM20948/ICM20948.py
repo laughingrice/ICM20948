@@ -42,10 +42,10 @@ class ICM20948:
 
         res = self.ReadReg(WHO_AM_I_ICM20948)
         if DEBUG_MSGS:
-            print('Who am I returned 0x{:02X}, expected 0xEA'.format(res[1]))
+            print('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
 
-        if res[1] != 0xEA:
-            raise('Who am I returned 0x{:02X}, expected 0xEA'.format(res[1]))
+        if res != 0xEA:
+            raise('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
 
     def __del__(self):
         self.spi.close()
@@ -59,9 +59,13 @@ class ICM20948:
         data = self.ReadRegs(ACCEL_XOUT_H, 6)
         data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
 
+        return data
+
     def ReadGyro(self):
         data = self.ReadRegs(GYRO_XOUT_H, 6)
         data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
+
+        return data
 
     def ReadCompas(self):
         pass
@@ -70,8 +74,10 @@ class ICM20948:
         data = self.ReadRegs(TEMP_OUT_H, 2)
         data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
 
+        return data
+
     def WriteReg(self, reg, data):
-        return self.WriteRegs(reg, [data])
+        return self.WriteRegs(reg, [data])[0]
 
     def WriteRegs(self, reg, data):
         msg = [reg] + data
@@ -80,7 +86,7 @@ class ICM20948:
         return res[1:]
 
     def ReadReg(self, reg):
-        return self.ReadRegs(self, reg, 1)
+        return self.ReadRegs(reg, 1)[0]
 
     def ReadRegs(self, reg, cnt):
         msg = [reg | READ_FLAG] + [0x00] * cnt

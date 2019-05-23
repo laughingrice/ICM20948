@@ -4,6 +4,8 @@
 # TODO: setup FIFO
 # TODO: work into Versatile framework
 
-from .ICM20948 import ICM20948_imu
+from .ICM20948 import ICM20948
 
 imu = ICM20948()
+
+print(imu.measure())
