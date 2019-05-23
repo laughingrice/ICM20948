@@ -142,3 +142,7 @@ I2C_SLV4_DO             = 0x16
 
 # Other constants
 READ_FLAG = 0x80
+REG_BANK_0 = (0 << 4)
+REG_BANK_1 = (1 << 4)
+REG_BANK_2 = (2 << 4)
+REG_BANK_3 = (3 << 4)
