@@ -45,7 +45,7 @@ class ICM20948:
             print('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
 
         if res != 0xEA:
-            raise('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
+            raise Exception('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
 
     def __del__(self):
         self.spi.close()
