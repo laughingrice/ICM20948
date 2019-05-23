@@ -3,7 +3,17 @@ import spidev
 
 from .defines import *
 
+def twos_comp(val, bits):
+    """
+    Returns two's complement of value given a number of bits
+    """          
+    return val - (1 << bits) if val & (1 << (bits - 1)) else val 
+    
 class ICM20948:
+    """
+    Class for managing the ICM20948 IMU
+    """
+
     def __init__(self, client=SPI_CLIENT):
         # ============
         # Setup device
@@ -24,11 +34,13 @@ class ICM20948:
         self.WriteReg(USER_CTRL, (1 << 4) | (1 << 3) | (1 << 2))
         time.sleep(0.1)
 
+
+
         # ===============
         # Check device ID
         # ===============
 
-        res = ReadReg(WHO_AM_I_ICM20948)
+        res = self.ReadReg(WHO_AM_I_ICM20948)
         if DEBUG_MSGS:
             print('Who am I returned 0x{:02X}, expected 0xEA'.format(res[1]))
 
@@ -40,20 +52,38 @@ class ICM20948:
 
 
     def measure(self):
-        pass
+        data = self.ReadACC() + self.ReadGyro() + self.ReadTemp()
+        return data
 
     def ReadACC(self):
-        acc_x_l = 0
-        
+        data = self.ReadRegs(ACCEL_XOUT_H, 6)
+        data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
+
+    def ReadGyro(self):
+        data = self.ReadRegs(GYRO_XOUT_H, 6)
+        data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
+
+    def ReadCompas(self):
+        pass
+
+    def ReadTemp(self):
+        data = self.ReadRegs(TEMP_OUT_H, 2)
+        data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
+
     def WriteReg(self, reg, data):
-        msg = [reg, data]
+        return self.WriteRegs(reg, [data])
+
+    def WriteRegs(self, reg, data):
+        msg = [reg] + data
         res = self.spi.xfer2(msg)
 
-        return res
+        return res[1:]
 
     def ReadReg(self, reg):
-        msg = [reg | READ_FLAG, 0x00]
+        return self.ReadRegs(self, reg, 1)
+
+    def ReadRegs(self, reg, cnt):
+        msg = [reg | READ_FLAG] + [0x00] * cnt
         res = self.spi.xfer2(msg)
 
-        return res
-
+        return res[1:]
