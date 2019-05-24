@@ -23,9 +23,13 @@ class ICM20948:
 
 
     def InitICM20948(self, client):
-        # ============
-        # Setup device
-        # ============
+        """
+        Setup device
+        """
+
+        # ==============
+        # Setup ICM20948
+        # ==============
 
         self.spi = spidev.SpiDev()
         self.spi.open(0, client)
@@ -38,8 +42,8 @@ class ICM20948:
         time.sleep(0.1)
 
         # Set User mode
-        # disable i2c and reset dmp and sram
-        self.WriteReg(USER_CTRL, (1 << 4) | (1 << 3) | (1 << 2))
+        # disable i2c slave, reset dmp and sram, enable i2c master
+        self.WriteReg(USER_CTRL, 0x3C)
 
         # Setup ranges
         self.SelectBank(REG_BANK_2)
@@ -51,24 +55,79 @@ class ICM20948:
         self.WriteReg(GYRO_CONFIG_1, 1 | (1 << 1) | (3 << 3)) # +-500 dps, 73.3 NBW Hz low pass
         self.WriteReg(TEMP_CONFIG, 3) # 65.9 NBW low pass
 
+        self.SelectBank(REG_BANK_0)
+
         self.acc_scale = 4.0 / (1 << 15)
         self.gyro_scale = 500.0 / (1 << 15)
         self.temp_scale = 0.01
 
+        time.sleep(0.1)
+
+        # Check device ID
+
+        res = self.ReadReg(WHO_AM_I_ICM20948)
+        if res != ICM20948_ID:
+            raise Exception('ICM20948 who am I returned 0x{:02X}, expected 0x{:02X}'.format(res, ICM20948_ID))
+
+        # ==================
+        # Setup Magnetometer
+        # ==================
+
+        self.SelectBank(REG_BANK_3)
+
+        # External device sampling rate if Gyro and ACC are disabled, 1.1KHz/2^val
+        self.WriteReg(I2C_MST_ODR_CONFIG, 2)
+        # Stop between reads (instead of reset)
+        self.WriteReg(I2C_MST_CTRL, 0x10)
+
+        # Soft reset
+        self.WriteReg(I2C_SLV0_ADDR, AK09916_ADDRESS)
+        self.WriteReg(I2C_SLV0_REG, AK09916_CNTL3)
+        self.WriteReg(I2C_SLV0_DO, 0x01)
+        self.WriteReg(I2C_SLV0_CTRL, 0x81)
+
+        time.sleep(0.5)
+
+        # Sensor ID
+        self.WriteReg(I2C_SLV0_ADDR, AK09916_ADDRESS | 0x80)
+        self.WriteReg(I2C_SLV0_REG, WHO_AM_I_AK09916)
+        self.WriteReg(I2C_SLV0_CTRL, 0x91)
+
         self.SelectBank(REG_BANK_0)
+        time.sleep(0.2)
+
+        res = self.ReadReg(EXT_SENS_DATA_00)
+        if res != AK09916_ID:
+            raise Exception('AK09916 who am I returned 0x{:02X}, expected 0x{:02X}'.format(res, AK09916_ID))
+
+        self.SelectBank(REG_BANK_3)
+
+        # Set to 100Hz data collection rate
+        self.WriteReg(I2C_SLV0_ADDR, AK09916_ADDRESS)
+        self.WriteReg(I2C_SLV0_REG, AK09916_CNTL2)
+        self.WriteReg(I2C_SLV0_DO, 0x08)
+        self.WriteReg(I2C_SLV0_CTRL, 0x81)
 
         time.sleep(0.2)
 
-        # ===============
-        # Check device ID
-        # ===============
+        # Collect data from slave at GYRO sampling rate
+        # We also read the data overflow register ST1 and magnetic overflow ST2 (& 0x08) but do not use them at the moment
+        self.WriteReg(I2C_SLV0_ADDR, AK09916_ADDRESS | 0x80)
+        self.WriteReg(I2C_SLV0_REG, AK09916_ST1)
+        self.WriteReg(I2C_SLV0_CTRL, 0x99)
 
-        res = self.ReadReg(WHO_AM_I_ICM20948)
-        if res != 0xEA:
-            raise Exception('Who am I returned 0x{:02X}, expected 0xEA'.format(res))
+        self.SelectBank(REG_BANK_0)
+
+        self.compass_scale = 0.15
+
+        time.sleep(0.2)
 
 
     def InitDPM(self):
+        # Reset memories, enable DPM and FIFO
+        self.WriteReg(USER_CTRL, 0xFE)
+        time.sleep(0.1)
+
         from .icm20948_img_dmp3a import dmp_img
 
         mem_bank = 0
@@ -111,7 +170,7 @@ class ICM20948:
 
 
     def measure(self):
-        data = self.ReadACC() + self.ReadGyro() + self.ReadTemp()
+        data = self.ReadACC() + self.ReadGyro() + self.ReadCompas() + self.ReadTemp()
         return data
 
 
@@ -130,11 +189,10 @@ class ICM20948:
 
 
     def ReadCompas(self):
-        """
-        Looks like this may require going through the onboard i2c interface as it does not
-        appear in the registers. Documentation not clear on this.
-        """
-        pass
+        data = self.ReadRegs(EXT_SENS_DATA_01, 6)
+        data = [twos_comp(x[0] + (x[1] << 8), 16) * self.compass_scale for x in zip(data[0::2], data[1::2])]
+
+        return data
 
 
     def ReadTemp(self):

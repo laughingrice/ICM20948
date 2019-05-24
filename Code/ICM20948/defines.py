@@ -7,9 +7,31 @@ DEBUG_MSGS = True
 SPI_DATA_RATE = 1000000
 SPI_CLIENT = 0
 
+# ====================
+# AK09916 Magnetometer
+# ====================
+
+AK09916_ID              = 0x09
+AK09916_ADDRESS         = 0x0C
+
+# Register Map
+WHO_AM_I_AK09916        = 0x01
+AK09916_ST1             = 0x10
+AK09916_XOUT_L          = 0x11
+AK09916_XOUT_H          = 0x12
+AK09916_YOUT_L          = 0x13
+AK09916_YOUT_H          = 0x14
+AK09916_ZOUT_L          = 0x15
+AK09916_ZOUT_H          = 0x16
+AK09916_ST2             = 0x18
+AK09916_CNTL2           = 0x31
+AK09916_CNTL3           = 0x32
+
 # =========
 # ICM-20948
 # =========
+
+ICM20948_ID             = 0xEA
 
 # USER BANK 0 REGISTER MAP
 WHO_AM_I_ICM20948       = 0x00
