@@ -7,12 +7,18 @@ DEBUG_MSGS = True
 SPI_DATA_RATE = 1000000
 SPI_CLIENT = 0
 
+# ==============
+# I2C parameters
+# ==============
+
+I2C_PORT = 1
+
 # ====================
 # AK09916 Magnetometer
 # ====================
 
 AK09916_ID              = 0x09
-AK09916_ADDRESS         = 0x0C
+AK09916_I2C_ADDRESS     = 0x0C
 
 # Register Map
 WHO_AM_I_AK09916        = 0x01
@@ -32,6 +38,9 @@ AK09916_CNTL3           = 0x32
 # =========
 
 ICM20948_ID             = 0xEA
+
+# ICM20948_I2C_ADDRESS    = 0x68
+ICM20948_I2C_ADDRESS         = 0x69
 
 # USER BANK 0 REGISTER MAP
 WHO_AM_I_ICM20948       = 0x00

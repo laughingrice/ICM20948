@@ -4,12 +4,14 @@
 
 import time
 from .ICM20948 import ICM20948
+from .bus import SPI_Bus, I2C_Bus
 
 imu = ICM20948()
 
 for i in range(10):
     try:
-        imu._setup()
+        bus = SPI_Bus()
+        imu._setup(bus)
     except Exception as e:
         print('got exception: {} - trying again'.format(e.args[0]))
 
