@@ -1,5 +1,6 @@
 import time
 from .defines import *
+from .bus import SPI_Bus
 
 def twos_comp(val: int, bits: int) -> int:
     '''
@@ -56,8 +57,10 @@ class ICM20948:
         self._acc.WriteReg(PWR_MGMT_1, 0x01) # Auto select clock
         time.sleep(0.1)
 
-        # disable i2c slave mode (SPI only mode), enable i2c master mode (to control magnetometer)
-        self._acc.WriteReg(USER_CTRL, (1 << 4) | (1 << 5))
+        flag = (1 << 5) # enable i2c master mode (to control magnetometer)
+        if type(self._acc) is SPI_Bus: # Disable i2c slave if we are in SPI mode, to avoid accidental switch
+            flag |= (1 << 4)
+        self._acc.WriteReg(USER_CTRL, flag)
 
         # Verify device ID
         res = self._acc.ReadReg(WHO_AM_I_ICM20948)
