@@ -4,7 +4,7 @@ DEBUG_MSGS = True
 # SPI Parameters
 # ==============
 
-SPI_DATA_RATE = 1000000
+SPI_DATA_RATE = 5120000
 SPI_CLIENT = 0
 
 # ==============
