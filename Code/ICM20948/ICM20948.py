@@ -1,5 +1,4 @@
 import time
-from .bus import SPI_Bus
 from .defines import *
 
 def twos_comp(val: int, bits: int) -> int:
@@ -30,7 +29,7 @@ class ICM20948:
         self.ICM20948_initialized = False
         self.AK09916_initialized = False
 
-    def _setup(self, bus=SPI_Bus()) -> None:
+    def _setup(self, bus=None) -> None:
         '''
         Perform actual setup and and intialization
         '''
