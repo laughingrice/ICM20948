@@ -346,10 +346,11 @@ class ICM20948:
 
         self.SelectBank(REG_BANK_3)
 
-        self._acc.WriteReg(I2C_SLV0_CTRL, 0xD0 | length)
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0x00) # Disable while setting up
         self._acc.WriteReg(I2C_SLV0_ADDR, 0x80 | AK09916_I2C_ADDRESS)
         self._acc.WriteReg(I2C_SLV0_REG, reg)
         self._acc.WriteReg(I2C_SLV0_DO, 0xff)
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0xD0 | length)
 
         self.SelectBank(REG_BANK_0)
 
@@ -370,9 +371,11 @@ class ICM20948:
 
         self.SelectBank(REG_BANK_3)
 
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0x00) # Disable while setting up
         self._acc.WriteReg(I2C_SLV0_ADDR, AK09916_I2C_ADDRESS)
         self._acc.WriteReg(I2C_SLV0_REG, reg)
         self._acc.WriteReg(I2C_SLV0_DO, data)
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0x81)
 
         self.SelectBank(REG_BANK_0)
 
@@ -382,6 +385,4 @@ class ICM20948:
         Check the magnetometer status self.ready bit
         '''
         return (self.ReadMagReg(AK09916_ST1) & 0x01) > 0
-
-
 
