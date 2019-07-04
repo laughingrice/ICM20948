@@ -30,6 +30,8 @@ class ICM20948:
         self.ICM20948_initialized = False
         self.AK09916_initialized = False
 
+        self.user_ctrl = 0
+
     def _setup(self, bus=None) -> None:
         '''
         Perform actual setup and and intialization
@@ -54,18 +56,20 @@ class ICM20948:
 
         self._acc.WriteReg(PWR_MGMT_1, 0x80) # Reset device
         time.sleep(0.1)
-        self._acc.WriteReg(PWR_MGMT_1, 0x01) # Auto select clock
-        time.sleep(0.1)
-
-        flag = (1 << 5) # enable i2c master mode (to control magnetometer)
-        if type(self._acc) is SPI_Bus: # Disable i2c slave if we are in SPI mode, to avoid accidental switch
-            flag |= (1 << 4)
-        self._acc.WriteReg(USER_CTRL, flag)
 
         # Verify device ID
         res = self._acc.ReadReg(WHO_AM_I_ICM20948)
         if res != ICM20948_ID:
             raise Exception('ICM20948 who am I returned 0x{:02X}, expected 0x{:02X}'.format(res, ICM20948_ID))
+
+        self._acc.WriteReg(PWR_MGMT_1, 0x01) # Auto select clock
+        self._acc.WriteReg(PWR_MGMT_2, 0x00) # Enable all devices
+
+        # Disable i2c slave if we are in SPI mode, to avoid accidental switch
+        self.user_ctrl = self._acc.ReadReg(USER_CTRL)
+        if type(self._acc) is SPI_Bus:
+            self.user_ctrl |= (1 << 4)
+            self._acc.WriteReg(USER_CTRL, self.user_ctrl)
 
         self.SelectBank(REG_BANK_2)
 
@@ -86,8 +90,6 @@ class ICM20948:
 
         self.SelectBank(REG_BANK_0)
 
-        time.sleep(0.1)
-
         self.ICM20948_initialized = True
 
 
@@ -101,36 +103,33 @@ class ICM20948:
         if self._acc is None:
             raise Exception('SPI not initialized yet')
 
-        if not self.ICM20948_initialized:
-            raise Exception('ICM20948 not initialized yet')
-
         if self.AK09916_initialized:
             return
 
-        # TODO: sparkfun code enables passthrough on the interupt pin when magentometer is enabled
-        self.SelectBank(REG_BANK_0)
-        reg = self._acc.ReadReg(INT_PIN_CFG)
-        reg |= 2
-        self._acc.WriteReg(INT_PIN_CFG, reg)
+        # Disable interupt bypass
+        self._acc.WriteReg(INT_PIN_CFG, 0x30)
 
+        self.user_ctrl |= 0x20 # enable i2c master mode (to control magnetometer)
+        self._acc.WriteReg(USER_CTRL, self.user_ctrl)
+
+        # Configure the i2c master
         self.SelectBank(REG_BANK_3)
 
-        # Stop between reads (instead of reset)
-        self._acc.WriteReg(I2C_MST_CTRL, 0x10)
-        # External device sampling rate if Gyro and ACC are disabled, 1.1KHz/2^val
-        self._acc.WriteReg(I2C_MST_ODR_CONFIG, 2)
+        self._acc.WriteReg(I2C_MST_CTRL, 0x1D)
+        self._acc.WriteReg(I2C_MST_DELAY_CTRL, 0x01)
 
-        # Soft reset
-        self.WriteMagReg(AK09916_CTRL_3, 0x01)
-        time.sleep(0.2)
+        # External device sampling rate if Gyro and ACC are disabled, 1.1KHz/2^val
+        # self._acc.WriteReg(I2C_MST_ODR_CONFIG, 2)
 
         # Sensor ID
         res = self.ReadMagReg(WHO_AM_I_AK09916)
         if res != AK09916_ID:
             raise Exception('AK09916 who am I returned 0x{:02X}, expected 0x{:02X}'.format(res, AK09916_ID))
 
-        # Set to single measurement mode - TODO: how do we trigger a measurement?
-        self.WriteMagReg(AK09916_CTRL_2, 0x01)
+       # Soft reset
+        self.WriteMagReg(AK09916_CTRL_3, 0x01)
+        while self.ReadMagReg(AK09916_CTRL_3) == 0x01:
+            time.sleep(0.0001)
 
         self.compass_scale = 0.15
 
@@ -198,7 +197,7 @@ class ICM20948:
         :returns: list of accelerometer + gyro + compass + temperature values
         '''
 
-        data = self.ReadACC() + self.ReadGyro() + self.ReadCompas() + self.ReadTemp()
+        data = self.ReadACC() + self.ReadGyro() + self.ReadTemp() + self.ReadCompas()
 
         return data
 
@@ -211,7 +210,7 @@ class ICM20948:
         '''
 
         if not self.ICM20948_initialized:
-            return [0,0,0]
+            return ['NaN', 'NaN', 'NaN']
 
         data = self._acc.ReadRegs(ACCEL_XOUT_H, 6)
         data = [twos_comp(x[1] + (x[0] << 8), 16) * self.acc_scale for x in zip(data[0::2], data[1::2])]
@@ -227,7 +226,7 @@ class ICM20948:
         '''
 
         if not self.ICM20948_initialized:
-            return [0,0,0]
+            return ['NaN', 'NaN', 'NaN']
 
         data = self._acc.ReadRegs(GYRO_XOUT_H, 6)
         data = [twos_comp(x[1] + (x[0] << 8), 16) * self.gyro_scale for x in zip(data[0::2], data[1::2])]
@@ -243,21 +242,15 @@ class ICM20948:
         '''
 
         if not self.AK09916_initialized:
-            return [0,0,0]
+            return ['NaN', 'NaN', 'NaN']
 
-        # TODO: seems to never be ready
-        # if not self.IsMagReady():
-        #     print('mag not ready')
-        # self.WriteMagReg(AK09916_CTRL_2, 0x01)
-        # result = self.ReadMagReg(AK09916_ST1)
+        # Trigger measurement
+        self.WriteMagReg(AK09916_CTRL_2, 0x01)
+        while not self.IsMagReady():
+            time.sleep(0.00001)
 
-        data = self.ReadMagRegs(AK09916_XOUT_L, 6)
-        data = [twos_comp(x[0] + (x[1] << 8), 16) * self.compass_scale for x in zip(data[0::2], data[1::2])]
-
-        # Read ST2 to confirm self.read finished, should be read after data read
-        result = self.ReadMagReg(AK09916_ST2)
-        # if result & 0x08:
-        #     print('Magnetic sensor overflow occured')
+        data = self.ReadMagRegs(AK09916_XOUT_L, 8)[:6] # Also reads ST2, dump the value as we don't use it now
+        data = [twos_comp(x[1] + (x[0] << 8), 16) * self.compass_scale for x in zip(data[0::2], data[1::2])]
 
         return data
 
@@ -353,9 +346,10 @@ class ICM20948:
 
         self.SelectBank(REG_BANK_3)
 
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0xD0 | length)
         self._acc.WriteReg(I2C_SLV0_ADDR, 0x80 | AK09916_I2C_ADDRESS)
         self._acc.WriteReg(I2C_SLV0_REG, reg)
-        self._acc.WriteReg(I2C_SLV0_CTRL, 0x80 | length)
+        self._acc.WriteReg(I2C_SLV0_DO, 0xff)
 
         self.SelectBank(REG_BANK_0)
 
