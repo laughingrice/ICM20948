@@ -30,8 +30,8 @@ AK09916_YOUT_H          = 0x14
 AK09916_ZOUT_L          = 0x15
 AK09916_ZOUT_H          = 0x16
 AK09916_ST2             = 0x18
-AK09916_CNTL2           = 0x31
-AK09916_CNTL3           = 0x32
+AK09916_CTRL_2          = 0x31
+AK09916_CTRL_3          = 0x32
 
 # =========
 # ICM-20948

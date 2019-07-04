@@ -115,14 +115,13 @@ class ICM20948:
 
         self.SelectBank(REG_BANK_3)
 
-        # Setup I2C master mode
-        # External device sampling rate if Gyro and ACC are disabled, 1.1KHz/2^val
-        self._acc.WriteReg(I2C_MST_ODR_CONFIG, 2)
         # Stop between reads (instead of reset)
         self._acc.WriteReg(I2C_MST_CTRL, 0x10)
+        # External device sampling rate if Gyro and ACC are disabled, 1.1KHz/2^val
+        self._acc.WriteReg(I2C_MST_ODR_CONFIG, 2)
 
         # Soft reset
-        self.WriteMagReg(AK09916_CNTL3, 0x01)
+        self.WriteMagReg(AK09916_CTRL_3, 0x01)
         time.sleep(0.2)
 
         # Sensor ID
@@ -130,14 +129,8 @@ class ICM20948:
         if res != AK09916_ID:
             raise Exception('AK09916 who am I returned 0x{:02X}, expected 0x{:02X}'.format(res, AK09916_ID))
 
-        # Set to 100Hz data collection rate
-        self.WriteMagReg(AK09916_CNTL2, 0x08)
-
-        # Collect data from slave at GYRO sampling rate
-        # We also read the data overflow register ST1 and magnetic overflow ST2 (& 0x08) but do not use them at the moment
-        self.ReadMagRegContinuous(AK09916_ST1, 9)
-
-#        time.sleep(0.2)
+        # Set to single measurement mode - TODO: how do we trigger a measurement?
+        self.WriteMagReg(AK09916_CTRL_2, 0x01)
 
         self.compass_scale = 0.15
 
@@ -252,8 +245,19 @@ class ICM20948:
         if not self.AK09916_initialized:
             return [0,0,0]
 
-        data = self._acc.ReadRegs(EXT_SENS_DATA_00, 9)
+        # TODO: seems to never be ready
+        # if not self.IsMagReady():
+        #     print('mag not ready')
+        # self.WriteMagReg(AK09916_CTRL_2, 0x01)
+        # result = self.ReadMagReg(AK09916_ST1)
+
+        data = self.ReadMagRegs(AK09916_XOUT_L, 6)
         data = [twos_comp(x[0] + (x[1] << 8), 16) * self.compass_scale for x in zip(data[0::2], data[1::2])]
+
+        # Read ST2 to confirm self.read finished, should be read after data read
+        result = self.ReadMagReg(AK09916_ST2)
+        # if result & 0x08:
+        #     print('Magnetic sensor overflow occured')
 
         return data
 
@@ -326,45 +330,40 @@ class ICM20948:
     def ReadMagReg(self, reg: int) -> int:
         '''
         Read magnetometer register
-        Note: disables continuous reading
+        # Note: disables continuous reading
 
         :param reg: register to read
 
         :returns: register value
         '''
 
-        self.SelectBank(REG_BANK_3)
-
-        self._acc.WriteReg(I2C_SLV0_ADDR, AK09916_I2C_ADDRESS | 0x80)
-        self._acc.WriteReg(I2C_SLV0_REG, reg)
-        self._acc.WriteReg(I2C_SLV0_CTRL, 0x81) # TODO: seems to require continuous read enabled to work
-
-        self.SelectBank(REG_BANK_0)
-
-        time.sleep(0.1)
-
-        data = self._acc.ReadReg(EXT_SENS_DATA_00)
-
-        self._acc.WriteReg(I2C_SLV0_CTRL, 0x0) # Disable continuous read after getting data
-
-        return data
+        return self.ReadMagRegs(reg, 1)[0]
 
 
-    def ReadMagRegContinuous(self, reg:int, len: int) -> None:
+    def ReadMagRegs(self, reg: int, length: int=1) -> list:
         '''
-        Enable continuous reading of magnetometer registers, values will be available in EXT_SENS_DATA_00 and onward
+        Read magnetometer registers
+        # Note: disables continuous reading
 
         :param reg: first register to read
-        :param len: number of values to read
+        :param length: number of registers to read
+
+        :returns: register values
         '''
 
         self.SelectBank(REG_BANK_3)
 
-        self._acc.WriteReg(I2C_SLV0_ADDR, AK09916_I2C_ADDRESS | 0x80)
+        self._acc.WriteReg(I2C_SLV0_ADDR, 0x80 | AK09916_I2C_ADDRESS)
         self._acc.WriteReg(I2C_SLV0_REG, reg)
-        self._acc.WriteReg(I2C_SLV0_CTRL, 0x80 + 9)
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0x80 | length)
 
         self.SelectBank(REG_BANK_0)
+
+        time.sleep(1e-3)
+
+        data = self._acc.ReadRegs(EXT_SENS_DATA_00, length)
+
+        return data
 
 
     def WriteMagReg(self, reg:int, data:int) -> None:
@@ -380,9 +379,15 @@ class ICM20948:
         self._acc.WriteReg(I2C_SLV0_ADDR, AK09916_I2C_ADDRESS)
         self._acc.WriteReg(I2C_SLV0_REG, reg)
         self._acc.WriteReg(I2C_SLV0_DO, data)
-        self._acc.WriteReg(I2C_SLV0_CTRL, 0x0)
 
         self.SelectBank(REG_BANK_0)
+
+
+    def IsMagReady(self):
+        '''
+        Check the magnetometer status self.ready bit
+        '''
+        return (self.ReadMagReg(AK09916_ST1) & 0x01) > 0
 
 
 
