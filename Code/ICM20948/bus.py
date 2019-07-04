@@ -22,7 +22,7 @@ try:
             '''
 
             # TODO: Looks like READ_FLAG is not needed for I2C
-            return self._acc.read_byte_data(ICM20948_I2C_ADDRESS, reg | READ_FLAG)
+            return self._acc.read_byte_data(ICM20948_I2C_ADDRESS, reg)
 
 
         def ReadRegs(self, reg: int, cnt: int) -> list:
@@ -35,7 +35,7 @@ try:
             :returns: list of register values
             '''
 
-            return self._acc.read_i2c_block_data(ICM20948_I2C_ADDRESS, reg | READ_FLAG, cnt)
+            return self._acc.read_i2c_block_data(ICM20948_I2C_ADDRESS, reg, cnt)
 
 
         def WriteReg(self, reg: int, data: int) -> None:
