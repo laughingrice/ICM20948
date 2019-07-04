@@ -197,7 +197,7 @@ class ICM20948:
         :returns: list of accelerometer + gyro + compass + temperature values
         '''
 
-        data = self.ReadACC() + self.ReadGyro() + self.ReadTemp() + self.ReadCompas()
+        data = self.ReadACC() + self.ReadGyro()+ self.ReadCompas() + self.ReadTemp()
 
         return data
 
