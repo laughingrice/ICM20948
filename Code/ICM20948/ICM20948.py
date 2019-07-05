@@ -263,6 +263,9 @@ class ICM20948:
         :returns: temperature in celsius
         '''
 
+        if not self.ICM20948_initialized:
+            return ['NaN']
+
         data = self._acc.ReadRegs(TEMP_OUT_H, 2)
         data = [twos_comp(x[1] + (x[0] << 8), 16) * self.temp_scale + self.temp_shift for x in zip(data[0::2], data[1::2])]
 
