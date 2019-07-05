@@ -1,17 +1,7 @@
 import time
 from .defines import *
 from .bus import SPI_Bus
-
-def twos_comp(val: int, bits: int) -> int:
-    '''
-    Returns two's complement of value given a number of bits
-
-    :param val: value to convert
-    :param bits: number of bits assumed for the conversion
-
-    :returns: two's complement value
-    '''          
-    return val - (1 << bits) if val & (1 << (bits - 1)) else val 
+import struct
 
 
 class ICM20948:
@@ -31,6 +21,9 @@ class ICM20948:
         self.AK09916_initialized = False
 
         self.user_ctrl = 0
+        self.acc_scale = 0
+        self.gyro_scale = 0
+        self.compass_scale = 0
 
     def _setup(self, bus=None) -> None:
         '''
@@ -201,8 +194,7 @@ class ICM20948:
         '''
 
         data = self._acc.ReadRegs(ACCEL_XOUT_H, 6 + 6 + 2 + 6)
-        data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
-
+        data = struct.unpack('>hhhhhhhhhh', bytes(data))
         scale = [self.acc_scale] * 3 + [self.gyro_scale] * 3 + [0.003] + [self.compass_scale] * 3
 
         data = [x[0] * x[1] for x in zip(data, scale)]
@@ -222,7 +214,8 @@ class ICM20948:
             return ['NaN', 'NaN', 'NaN']
 
         data = self._acc.ReadRegs(ACCEL_XOUT_H, 6)
-        data = [twos_comp(x[1] + (x[0] << 8), 16) * self.acc_scale for x in zip(data[0::2], data[1::2])]
+        data = struct.unpack('>hhh', bytes(data))
+        data = [x * self.acc_scale for x in data]
 
         return data
 
@@ -238,7 +231,8 @@ class ICM20948:
             return ['NaN', 'NaN', 'NaN']
 
         data = self._acc.ReadRegs(GYRO_XOUT_H, 6)
-        data = [twos_comp(x[1] + (x[0] << 8), 16) * self.gyro_scale for x in zip(data[0::2], data[1::2])]
+        data = struct.unpack('>hhh', bytes(data))
+        data = [x * self.gyro_scale for x in data]
 
         return data
 
@@ -261,7 +255,8 @@ class ICM20948:
             time.sleep(0.0001)
 
         data = self.ReadMagRegs(AK09916_XOUT_L, 8)[:6] # Also reads ST2, dump the value as we don't use it now
-        data = [twos_comp(x[1] + (x[0] << 8), 16) * self.compass_scale for x in zip(data[0::2], data[1::2])]
+        data = struct.unpack('>hhh', bytes(data))
+        data = [x * self.compass_scale for x in data]
 
         return data
 
@@ -277,7 +272,7 @@ class ICM20948:
             return ['NaN']
 
         data = self._acc.ReadRegs(TEMP_OUT_H, 2)
-        data = [(twos_comp(x[1] + (x[0] << 8), 16) - 21) * 0.003 + 21.0 for x in zip(data[0::2], data[1::2])]
+        data = [struct.unpack('>h', bytes(data))[0] * 0.003 + 20.937]
 
         return data
 
