@@ -85,8 +85,6 @@ class ICM20948:
         self.gyro_scale = 500.0 / (1 << 15)
         # Temp LPF 65.9 NBW low pass 
         self._acc.WriteReg(TEMP_CONFIG, 3)
-        self.temp_scale = 0.003
-        self.temp_shift = 21
 
         self.SelectBank(REG_BANK_0)
 
@@ -267,7 +265,7 @@ class ICM20948:
             return ['NaN']
 
         data = self._acc.ReadRegs(TEMP_OUT_H, 2)
-        data = [twos_comp(x[1] + (x[0] << 8), 16) * self.temp_scale + self.temp_shift for x in zip(data[0::2], data[1::2])]
+        data = [(twos_comp(x[1] + (x[0] << 8), 16) - 21) * 0.003 + 21.0 for x in zip(data[0::2], data[1::2])]
 
         return data
 
