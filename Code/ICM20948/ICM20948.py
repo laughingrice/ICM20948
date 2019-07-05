@@ -31,6 +31,9 @@ class ICM20948:
         self.AK09916_initialized = False
 
         self.user_ctrl = 0
+        self.acc_scale = 0
+        self.gyro_scale = 0
+        self.compass_scale = 0
 
     def _setup(self, bus=None) -> None:
         '''
