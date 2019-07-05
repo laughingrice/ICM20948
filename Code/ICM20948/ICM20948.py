@@ -74,8 +74,9 @@ class ICM20948:
         self.SelectBank(REG_BANK_2)
 
         # Setup sampling rate, rate divider if LPF is enabled, rate = 1125Hz / (1 + divider)
-        self._acc.WriteReg(ACCEL_SMPLRT_DIV_2, 4)
-        self._acc.WriteReg(GYRO_SMPLRT_DIV, 4)
+        self._acc.WriteReg(ACCEL_SMPLRT_DIV_1, 0)
+        self._acc.WriteReg(ACCEL_SMPLRT_DIV_2, 5)
+        self._acc.WriteReg(GYRO_SMPLRT_DIV, 5) # Should also control the DMP and slave reading sample rate
 
         # Accelerometer range and LPF: +-4g, 70Hz NBW low pass
         self._acc.WriteReg(ACCEL_CONFIG, 1 | (1 << 1) | (3 << 3))
@@ -124,10 +125,14 @@ class ICM20948:
         if res != AK09916_ID:
             raise Exception('AK09916 who am I returned 0x{:02X}, expected 0x{:02X}'.format(res, AK09916_ID))
 
-       # Soft reset
+        # Soft reset
         self.WriteMagReg(AK09916_CTRL_3, 0x01)
         while self.ReadMagReg(AK09916_CTRL_3) == 0x01:
             time.sleep(0.0001)
+
+        # Start continuous reading of magnetometer data
+        time.sleep(0.01)
+        self.ReadMagContinuous(AK09916_XOUT_L, 8)
 
         self.compass_scale = 0.15
 
@@ -195,7 +200,13 @@ class ICM20948:
         :returns: list of accelerometer + gyro + compass + temperature values
         '''
 
-        data = self.ReadACC() + self.ReadGyro()+ self.ReadCompas() + self.ReadTemp()
+        data = self._acc.ReadRegs(ACCEL_XOUT_H, 6 + 6 + 2 + 6)
+        data = [twos_comp(x[1] + (x[0] << 8), 16) for x in zip(data[0::2], data[1::2])]
+
+        scale = [self.acc_scale] * 3 + [self.gyro_scale] * 3 + [0.003] + [self.compass_scale] * 3
+
+        data = [x[0] * x[1] for x in zip(data, scale)]
+        data[6] += 20.937
 
         return data
 
@@ -363,6 +374,31 @@ class ICM20948:
 
         return data
 
+
+    def ReadMagContinuous(self, reg: int, length: int=1) -> None:
+        '''
+        Setup continuous measurement
+
+        :param reg: first register to read
+        :param length: number of registers to read
+
+        :returns: register values
+        '''
+
+        self.WriteMagReg(AK09916_CTRL_2, 0x08)
+
+        self.SelectBank(REG_BANK_3)
+
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0x00) # Disable while setting up
+        self._acc.WriteReg(I2C_SLV0_ADDR, 0x80 | AK09916_I2C_ADDRESS)
+        self._acc.WriteReg(I2C_SLV0_REG, reg)
+        self._acc.WriteReg(I2C_SLV0_DO, 0xff)
+        self._acc.WriteReg(I2C_SLV0_CTRL, 0xD0 | length)
+
+        self.SelectBank(REG_BANK_0)
+
+        time.sleep(1e-3)
+        
 
     def WriteMagReg(self, reg:int, data:int) -> None:
         '''
