@@ -197,7 +197,7 @@ class ICM20948:
         '''
         Read sensor data
 
-        :returns: list of accelerometer + gyro + compass + temperature values
+        :returns: list of accelerometer + gyro + temperature + compass values
         '''
 
         data = self._acc.ReadRegs(ACCEL_XOUT_H, 6 + 6 + 2 + 6)
