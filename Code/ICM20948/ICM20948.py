@@ -243,7 +243,8 @@ class ICM20948:
             return ['NaN', 'NaN', 'NaN']
 
         # Trigger measurement
-        self.WriteMagReg(AK09916_CTRL_2, 0x01)
+        self.WriteMagReg(AK09916_CTRL_2, 0x08)
+
         # Give the sensor a change if it is not ready, but do not wait too long not to lock up the system
         if not self.IsMagReady():
             time.sleep(0.0001)
