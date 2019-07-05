@@ -246,8 +246,9 @@ class ICM20948:
 
         # Trigger measurement
         self.WriteMagReg(AK09916_CTRL_2, 0x01)
-        while not self.IsMagReady():
-            time.sleep(0.00001)
+        # Give the sensor a change if it is not ready, but do not wait too long not to lock up the system
+        if not self.IsMagReady():
+            time.sleep(0.0001)
 
         data = self.ReadMagRegs(AK09916_XOUT_L, 8)[:6] # Also reads ST2, dump the value as we don't use it now
         data = [twos_comp(x[1] + (x[0] << 8), 16) * self.compass_scale for x in zip(data[0::2], data[1::2])]
