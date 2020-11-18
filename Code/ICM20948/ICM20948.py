@@ -132,12 +132,12 @@ class ICM20948:
         self.AK09916_initialized = True
 
 
-    def InitDPM(self) -> None:
+    def InitDMP(self) -> None:
         '''
-        Load the DPM firmware
+        Load the DMP firmware
         '''
 
-        # Reset memories, enable DPM and FIFO
+        # Reset memories, enable DMP and FIFO
         self._acc.WriteReg(USER_CTRL, 0xFE)
         time.sleep(0.1)
 
@@ -147,7 +147,7 @@ class ICM20948:
         start_address = DMP_LOAD_START
         data_pos = 0
 
-        # Write dpm firmware to memory
+        # Write DMP firmware to memory
         while data_pos < len(dmp_img):
             write_len = min((256 - start_address, len(dmp_img[data_pos:])))
             self.WriteMems(mem_bank, start_address, dmp_img[data_pos:data_pos + write_len])
@@ -157,9 +157,9 @@ class ICM20948:
             start_address = 0
 
 
-    def ValidateDPM(self) -> None:
+    def ValidateDMP(self) -> None:
         '''
-        Validate the DPM firmware
+        Validate the DMP firmware
         '''
 
         from .icm20948_img_dmp3a import dmp_img  # So that we know how much to read  
@@ -170,7 +170,7 @@ class ICM20948:
         start_address = DMP_LOAD_START
         data_pos = 0
 
-        # Write dpm firmware to memory
+        # Write DMP firmware to memory
         while data_pos < len(dmp_img):
             read_len = min((256 - start_address, len(dmp_img[data_pos:])))
             read_img[data_pos:data_pos + read_len] = self.ReadMems(mem_bank, start_address, read_len)
